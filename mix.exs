@@ -33,13 +33,17 @@ defmodule AuthApp.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:phoenix, path: "../..", override: true},
+      {:bcrypt_elixir, "~> 3.0"},
+      {:phoenix, github: "phoenixframework/phoenix", branch: "main", override: true},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.10"},
       {:ecto_sqlite3, ">= 0.0.0"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.0.0"},
+      {:phoenix_live_view,
+       github: "phoenixframework/phoenix_live_view",
+       branch: "sd-put-session-cookie-assets",
+       override: true},
       {:floki, ">= 0.30.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},

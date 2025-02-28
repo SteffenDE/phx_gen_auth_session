@@ -11,8 +11,7 @@ defmodule AuthApp.Application do
       AuthAppWeb.Telemetry,
       AuthApp.Repo,
       {Ecto.Migrator,
-        repos: Application.fetch_env!(:auth_app, :ecto_repos),
-        skip: skip_migrations?()},
+       repos: Application.fetch_env!(:auth_app, :ecto_repos), skip: skip_migrations?()},
       {DNSCluster, query: Application.get_env(:auth_app, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: AuthApp.PubSub},
       # Start a worker by calling: AuthApp.Worker.start_link(arg)
