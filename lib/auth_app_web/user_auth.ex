@@ -28,31 +28,34 @@ defmodule AuthAppWeb.UserAuth do
   In case the user re-authenticates for sudo mode,
   the existing remember_me setting is kept, writing a new remember_me cookie.
   """
-  def log_in_user(conn, user, params \\ %{}) do
-    token = Accounts.generate_user_session_token(user)
-    user_return_to = get_session(conn, :user_return_to)
-    remember_me = get_session(conn, :user_remember_me)
 
-    conn
+  def log_in_user(conn_or_socket, user, params \\ %{})
+
+  def log_in_user(%Phoenix.LiveView.Socket{} = socket, user, params) do
+    token = Accounts.generate_user_session_token(user)
+    user_return_to = Phoenix.LiveView.get_session(socket, :user_return_to)
+    remember_me = Phoenix.LiveView.get_session(socket, :user_remember_me)
+
+    socket
     |> renew_session()
     |> put_token_in_session(token)
-    |> maybe_write_remember_me_cookie(token, params, remember_me)
-    |> redirect(to: user_return_to || signed_in_path(conn))
+    # |> maybe_write_remember_me_cookie(token, params, remember_me)
+    |> Phoenix.LiveView.redirect(to: user_return_to || signed_in_path(socket))
   end
 
-  defp maybe_write_remember_me_cookie(conn, token, %{"remember_me" => "true"}, _),
-    do: write_remember_me_cookie(conn, token)
+  # defp maybe_write_remember_me_cookie(conn, token, %{"remember_me" => "true"}, _),
+  #   do: write_remember_me_cookie(conn, token)
 
-  defp maybe_write_remember_me_cookie(conn, token, _params, true),
-    do: write_remember_me_cookie(conn, token)
+  # defp maybe_write_remember_me_cookie(conn, token, _params, true),
+  #   do: write_remember_me_cookie(conn, token)
 
-  defp maybe_write_remember_me_cookie(conn, _token, _params, _), do: conn
+  # defp maybe_write_remember_me_cookie(conn, _token, _params, _), do: conn
 
-  defp write_remember_me_cookie(conn, token) do
-    conn
-    |> put_session(:user_remember_me, true)
-    |> put_resp_cookie(@remember_me_cookie, token, @remember_me_options)
-  end
+  # defp write_remember_me_cookie(conn, token) do
+  #   conn
+  #   |> put_session(:user_remember_me, true)
+  #   |> put_resp_cookie(@remember_me_cookie, token, @remember_me_options)
+  # end
 
   # This function renews the session ID and erases the whole
   # session to avoid fixation attacks. If there is any data
@@ -69,7 +72,7 @@ defmodule AuthAppWeb.UserAuth do
   #       |> put_session(:preferred_locale, preferred_locale)
   #     end
   #
-  defp renew_session(conn) do
+  defp renew_session(%Plug.Conn{} = conn) do
     delete_csrf_token()
 
     conn
@@ -77,12 +80,34 @@ defmodule AuthAppWeb.UserAuth do
     |> clear_session()
   end
 
+  defp renew_session(%Phoenix.LiveView.Socket{} = socket) do
+    # delete_csrf_token()
+
+    socket
+    |> Phoenix.LiveView.configure_session(renew: true)
+    |> Phoenix.LiveView.clear_session()
+  end
+
   @doc """
   Logs the user out.
 
   It clears all session data for safety. See renew_session.
   """
-  def log_out_user(conn) do
+  def log_out_user(%Phoenix.LiveView.Socket{} = socket) do
+    user_token = Phoenix.LiveView.get_session(socket, :user_token)
+    user_token && Accounts.delete_user_session_token(user_token)
+
+    if live_socket_id = Phoenix.LiveView.get_session(socket, :live_socket_id) do
+      AuthAppWeb.Endpoint.broadcast(live_socket_id, "disconnect", %{})
+    end
+
+    socket
+    |> renew_session()
+    # |> delete_resp_cookie(@remember_me_cookie)
+    |> Phoenix.LiveView.redirect(to: ~p"/")
+  end
+
+  def log_out_user(%Plug.Conn{} = conn) do
     user_token = get_session(conn, :user_token)
     user_token && Accounts.delete_user_session_token(user_token)
 
@@ -92,7 +117,7 @@ defmodule AuthAppWeb.UserAuth do
 
     conn
     |> renew_session()
-    |> delete_resp_cookie(@remember_me_cookie)
+    # |> delete_resp_cookie(@remember_me_cookie)
     |> redirect(to: ~p"/")
   end
 
@@ -212,7 +237,13 @@ defmodule AuthAppWeb.UserAuth do
     end
   end
 
-  defp put_token_in_session(conn, token) do
+  defp put_token_in_session(%Phoenix.LiveView.Socket{} = socket, token) do
+    socket
+    |> Phoenix.LiveView.put_session(:user_token, token)
+    |> Phoenix.LiveView.put_session(:live_socket_id, user_session_topic(token))
+  end
+
+  defp put_token_in_session(%Plug.Conn{} = conn, token) do
     conn
     |> put_session(:user_token, token)
     |> put_session(:live_socket_id, user_session_topic(token))

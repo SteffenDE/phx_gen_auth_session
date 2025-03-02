@@ -100,8 +100,18 @@ defmodule AuthAppWeb.UserLive.Login do
     {:ok, assign(socket, form: form, trigger_submit: false)}
   end
 
-  def handle_event("submit_password", _params, socket) do
-    {:noreply, assign(socket, :trigger_submit, true)}
+  def handle_event("submit_password", %{"user" => %{"email" => email, "password" => password} = user_params}, socket) do
+    if user = Accounts.get_user_by_email_and_password(email, password) do
+      socket
+      |> put_flash(:info, "Welcome back!")
+      |> AuthAppWeb.UserAuth.log_in_user(user, user_params)
+      |> then(&{:noreply, &1})
+    else
+      # In order to prevent user enumeration attacks, don't disclose whether the email is registered.
+      socket
+      |> put_flash(:error, "Invalid email or password")
+      |> then(&{:noreply, &1})
+    end
   end
 
   def handle_event("submit_magic", %{"user" => %{"email" => email}}, socket) do

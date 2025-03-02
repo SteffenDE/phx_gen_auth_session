@@ -69,7 +69,21 @@ defmodule AuthAppWeb.UserLive.Confirmation do
     end
   end
 
-  def handle_event("submit", %{"user" => params}, socket) do
-    {:noreply, assign(socket, form: to_form(params, as: "user"), trigger_submit: true)}
+  def handle_event("submit", %{"user" => %{"token" => token} = user_params}, socket) do
+    case Accounts.login_user_by_magic_link(token) do
+      {:ok, user, tokens_to_disconnect} ->
+        AuthAppWeb.UserAuth.disconnect_sessions(tokens_to_disconnect)
+
+        socket
+        |> put_flash(:info, "Welcome back!")
+        |> AuthAppWeb.UserAuth.log_in_user(user, user_params)
+        |> then(&{:noreply, &1})
+
+      _ ->
+        socket
+        |> put_flash(:error, "The link is invalid or it has expired.")
+        |> push_navigate(to: ~p"/users/log-in")
+        |> then(&{:noreply, &1})
+    end
   end
 end
